@@ -33,6 +33,16 @@ Screenshots are generated automatically by the **Screenshots** workflow (`script
 - **Tools**: a plate calculator (UK plates) and a 1RM calculator with rep targets.
 - Works offline: everything is saved on the device as you log.
 
+## Install on your iPhone (no Mac needed)
+
+The **Build IPA** workflow produces `dist/LiftBros-unsigned.ipa` (Release, arm64, iOS 17+) on every app change.
+
+1. Download `dist/LiftBros-unsigned.ipa` from this branch.
+2. Install [Sideloadly](https://sideloadly.io) (Windows or Mac) or AltStore, plug in your iPhone, drag in the .ipa and sign in with your Apple ID. The tool signs the app with your account as it installs.
+3. On the iPhone, turn on **Settings → Privacy & Security → Developer Mode**, then trust your Apple ID under **Settings → General → VPN & Device Management**.
+
+With a free Apple ID the app must be re-signed every 7 days (Sideloadly/AltStore can refresh it). A paid Apple Developer account removes that limit and enables TestFlight.
+
 ## Running it
 
 Requires **Xcode 16+** and iOS 17+.
