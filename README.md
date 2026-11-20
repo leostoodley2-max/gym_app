@@ -2,6 +2,24 @@
 
 An iOS app for UK gym-goers to log lifts, climb their gym's leaderboard and see how they rank across the United Kingdom.
 
+## Screenshots
+
+| Train | Workout | Log a set | Set proof |
+|---|---|---|---|
+| ![Train](docs/screenshots/02-train.png) | ![Workout](docs/screenshots/03-workout.png) | ![Log set](docs/screenshots/04-logSet.png) | ![Set detail](docs/screenshots/05-setDetail.png) |
+
+| Gym rankings | UK rankings | Pound for pound | Other lifter |
+|---|---|---|---|
+| ![Gym](docs/screenshots/06-rankingsGym.png) | ![UK](docs/screenshots/07-rankingsUK.png) | ![P4P](docs/screenshots/08-rankingsP4P.png) | ![Lifter](docs/screenshots/09-lifter.png) |
+
+| Welcome | Progress | Profile |
+|---|---|---|
+| ![Welcome](docs/screenshots/01-onboarding.png) | ![Progress](docs/screenshots/10-progress.png) | ![Profile](docs/screenshots/11-profile.png) |
+
+🎬 [Screen recording (30 s tour)](docs/screenshots/liftbros-tour.mp4)
+
+Screenshots are generated automatically by the **Screenshots** workflow (`scripts/capture-screens.sh`), using the app's Debug-only demo mode (`-LBDemo`, `-LBScreen <name>`, `-LBTour`).
+
 ## Features
 
 - **Workout logging**: 26 commercial-gym exercises, including bench press, squat, deadlift, lat pulldown, leg press, cable rows, machines, dumbbells and weighted pull-ups/dips. Log weight × reps, warm-ups and RPE. It includes a rest timer and PR celebrations, and pre-fills from your last set.
