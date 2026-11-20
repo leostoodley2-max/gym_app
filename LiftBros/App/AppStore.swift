@@ -373,6 +373,16 @@ final class AppStore {
 
     // MARK: - Housekeeping
 
+    /// Replaces everything in the store (used by demo mode).
+    func replaceAllData(_ data: AppData) {
+        profile = data.profile
+        sessions = data.sessions
+        activeSession = data.activeSession
+        bodyMetrics = data.bodyMetrics
+        communityCache = [:]
+        changed()
+    }
+
     func resetAllData() {
         local.reset()
         profile = nil

@@ -42,7 +42,11 @@ public actor MockBackendService: BackendService {
     }
 
     public func verificationStatus(setID: UUID) async throws -> VerificationStatus {
-        guard let submitted = proofSubmissions[setID] else { return .unverified }
+        guard let submitted = proofSubmissions[setID] else {
+            // Unknown to this in-memory backend (e.g. after an app relaunch): treat as just submitted.
+            proofSubmissions[setID] = Date()
+            return reviewDelay <= 0 ? .verified : .pending
+        }
         return Date().timeIntervalSince(submitted) >= reviewDelay ? .verified : .pending
     }
 

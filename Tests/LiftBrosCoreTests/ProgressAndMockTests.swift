@@ -89,12 +89,17 @@ final class MockCommunityTests: XCTestCase {
     func testMockBackendVerificationFlow() async throws {
         let backend = MockBackendService(seed: 1, reviewDelay: 0)
         let setID = UUID()
-        let unverified = try await backend.verificationStatus(setID: setID)
-        XCTAssertEqual(unverified, .unverified)
         let submitted = try await backend.submitProof(setID: setID, fileURL: URL(fileURLWithPath: "/tmp/x.mov"), kind: .video)
         XCTAssertEqual(submitted, .pending)
         let reviewed = try await backend.verificationStatus(setID: setID)
         XCTAssertEqual(reviewed, .verified)
+    }
+
+    func testPendingProofSurvivesBackendRestart() async throws {
+        // A fresh backend doesn't know about proof submitted before an app relaunch; it must not drop to unverified.
+        let backend = MockBackendService(seed: 1, reviewDelay: 3600)
+        let status = try await backend.verificationStatus(setID: UUID())
+        XCTAssertEqual(status, .pending)
     }
 
     func testPrivateProgressIsHidden() async throws {

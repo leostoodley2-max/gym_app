@@ -9,9 +9,11 @@ struct ActiveWorkoutView: View {
     @State private var confirmFinish = false
     @State private var confirmDiscard = false
     @State private var restTimer = RestTimer()
+    @State private var path: [UUID] = []
+    private let demo = DemoDirector.shared
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if let session = store.activeSession {
                     workoutList(session)
@@ -65,6 +67,16 @@ struct ActiveWorkoutView: View {
                 LogSetView(entryID: entry.id, exerciseID: entry.exerciseID) { isWarmup in
                     restTimer.start(seconds: isWarmup ? 60 : restTimer.defaultSeconds)
                 }
+            }
+            .onChange(of: demo.logSetOpen) { _, open in
+                guard demo.isEnabled else { return }
+                logTarget = open ? store.activeSession?.entries.first : nil
+            }
+            .onChange(of: demo.restTimerTick) { _, _ in
+                if demo.isEnabled { restTimer.start(seconds: 90) }
+            }
+            .onChange(of: demo.setToOpen, initial: true) { _, setID in
+                if demo.isEnabled, let setID { path = [setID] }
             }
             .confirmationDialog("Finish this workout?", isPresented: $confirmFinish, titleVisibility: .visible) {
                 Button("Finish workout") {

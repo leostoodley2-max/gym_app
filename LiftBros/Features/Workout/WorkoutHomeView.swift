@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkoutHomeView: View {
     @Environment(AppStore.self) private var store
     @State private var showActiveWorkout = false
+    private let demo = DemoDirector.shared
 
     var body: some View {
         NavigationStack {
@@ -22,6 +23,9 @@ struct WorkoutHomeView: View {
             }
             .fullScreenCover(isPresented: $showActiveWorkout) {
                 ActiveWorkoutView()
+            }
+            .onChange(of: demo.showActiveWorkout) { _, show in
+                if demo.isEnabled { showActiveWorkout = show }
             }
         }
     }

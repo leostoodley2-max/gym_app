@@ -22,6 +22,8 @@ struct LeaderboardView: View {
     @State private var isLoading = true
     @State private var flagTarget: LeaderboardRow?
     @State private var showFlagThanks = false
+    @State private var path: [UUID] = []
+    private let demo = DemoDirector.shared
 
     private var query: LeaderboardQuery {
         LeaderboardQuery(exerciseID: exerciseID,
@@ -30,7 +32,7 @@ struct LeaderboardView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 controls
                 yourRank
@@ -54,6 +56,17 @@ struct LeaderboardView: View {
             }
             .task(id: ReloadKey(query: query, dataVersion: store.dataVersion)) {
                 await reload()
+            }
+            .onChange(of: demo.leaderboardUK, initial: true) { _, uk in
+                if demo.isEnabled { scope = uk ? .uk : .gym }
+            }
+            .onChange(of: demo.leaderboardRelative, initial: true) { _, relative in
+                if demo.isEnabled { metric = relative ? .relative : .absolute }
+            }
+            .onChange(of: demo.openTopLifterTick) { _, _ in
+                if demo.isEnabled, let row = rows.first(where: { !$0.isCurrentUser }) {
+                    path.append(row.record.lifterID)
+                }
             }
             .refreshable {
                 store.clearCommunityCache()
