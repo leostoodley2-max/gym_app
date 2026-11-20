@@ -63,10 +63,11 @@ struct LifterProfileView: View {
                         Text(profile.displayName).font(.title3.weight(.bold))
                         Text("@\(profile.username)").foregroundStyle(.secondary)
                         if let gym = store.gym(id: profile.gymID) {
-                            Label(gym.name, systemImage: "mappin.and.ellipse").font(.caption)
+                            GymCaption(name: gym.name)
                         }
                     }
                 }
+                .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                 LabeledContent("Lifting for", value: yearsLabel(profile.yearsLifting))
                 LabeledContent("Bodyweight", value: Format.weight(profile.bodyweightKg, store.unit))
                 if store.canView(profile.bodyStatsVisibility, ownerGymID: profile.gymID) {

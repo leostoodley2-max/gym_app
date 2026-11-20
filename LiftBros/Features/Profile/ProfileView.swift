@@ -67,11 +67,12 @@ struct ProfileView: View {
                     Text(profile.displayName).font(.title2.weight(.bold))
                     Text("@\(profile.username)").foregroundStyle(.secondary)
                     if let gym = store.currentGym {
-                        Label(gym.name, systemImage: "mappin.and.ellipse").font(.caption)
+                        GymCaption(name: gym.name)
                     }
                 }
             }
             .padding(.vertical, 4)
+            .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
             if !profile.bio.isEmpty {
                 Text(profile.bio).font(.subheadline)
             }

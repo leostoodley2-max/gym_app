@@ -6,12 +6,19 @@ struct VerificationBadge: View {
 
     var body: some View {
         if showsLabel {
-            Label(status.displayName, systemImage: status.symbol)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(status.color)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(status.color.opacity(0.12), in: Capsule())
+            // HStack rather than Label: inside List rows, Label gets list icon spacing.
+            HStack(spacing: 4) {
+                Image(systemName: status.symbol)
+                Text(status.displayName)
+            }
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(status.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(status.color.opacity(0.12), in: Capsule())
+            .accessibilityElement(children: .combine)
         } else {
             Image(systemName: status.symbol)
                 .font(.caption)
@@ -123,5 +130,18 @@ struct RankMedal: View {
                 if let color { Circle().fill(color) }
             }
             .accessibilityLabel("Rank \(rank)")
+    }
+}
+
+/// Small "pin + gym name" caption for profile headers inside lists.
+struct GymCaption: View {
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "mappin.and.ellipse").foregroundStyle(Theme.accent)
+            Text(name)
+        }
+        .font(.caption)
     }
 }

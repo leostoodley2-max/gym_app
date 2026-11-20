@@ -70,6 +70,7 @@ struct SetDetailView: View {
                         Spacer()
                         if set.verification == .pending { ProgressView() }
                     }
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     VerificationExplainer(status: set.verification)
                     if let proof = set.proof {
                         ProofPreview(media: proof, url: store.proofURL(for: proof))
