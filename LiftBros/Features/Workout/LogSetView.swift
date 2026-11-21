@@ -20,6 +20,7 @@ struct LogSetView: View {
     @State private var isLoadingProof = false
     @State private var errorMessage: String?
     @State private var didPrefill = false
+    @State private var showPaywall = false
 
     private var exercise: Exercise? { ExerciseLibrary.exercise(id: exerciseID) }
     private var unit: WeightUnit { store.unit }
@@ -65,8 +66,10 @@ struct LogSetView: View {
                     proofSection
                 }
             }
-            .navigationTitle(exercise?.name ?? "Log set")
+            .darkList()
+            .navigationTitle((exercise?.name ?? "Log set").uppercased())
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showPaywall) { PaywallView() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -82,7 +85,7 @@ struct LogSetView: View {
                 guard let item else { return }
                 Task { await loadProof(item) }
             }
-            .alert("Proof error", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            .alert("Evidence error", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "")
@@ -115,22 +118,37 @@ struct LogSetView: View {
 
     private var proofSection: some View {
         Section {
-            PhotosPicker(selection: $pickerItem, matching: .any(of: [.videos, .images])) {
-                HStack {
-                    Label(pickedProof == nil ? "Attach video proof" : "Replace proof",
-                          systemImage: pickedProof == nil ? "video.badge.plus" : "arrow.triangle.2.circlepath")
-                    Spacer()
-                    if isLoadingProof { ProgressView() }
+            if store.canUploadEvidence {
+                PhotosPicker(selection: $pickerItem, matching: .any(of: [.videos, .images])) {
+                    HStack {
+                        Label(pickedProof == nil ? "Attach video evidence" : "Replace evidence",
+                              systemImage: pickedProof == nil ? "video.badge.plus" : "arrow.triangle.2.circlepath")
+                            .foregroundStyle(Theme.accent)
+                        Spacer()
+                        if isLoadingProof { ProgressView() }
+                    }
+                }
+                if let pickedProof {
+                    Label(pickedProof.kind == .video ? "Video attached" : "Photo attached", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.teal)
+                }
+                if let left = store.evidenceUploadsLeft {
+                    Text("\(left) of \(PlanLimits.freeEvidenceUploadsPerMonth) free uploads left this month")
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+            } else {
+                Button {
+                    showPaywall = true
+                } label: {
+                    Label("Monthly evidence limit reached. Go Pro for unlimited.", systemImage: "crown.fill")
+                        .foregroundStyle(Theme.accent)
                 }
             }
-            if let pickedProof {
-                Label(pickedProof.kind == .video ? "Video attached" : "Photo attached", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            }
         } header: {
-            Text("Proof (optional)")
+            Text("Evidence (optional)")
         } footer: {
-            Text("Sets with proof are reviewed and marked verified. Sets without proof still rank, marked unverified. You can also add proof later.")
+            Text("Your gym leaderboard runs on the honour system, so this set counts straight away. Evidence is only needed to appear in the national top 100.")
         }
     }
 

@@ -16,10 +16,11 @@ public struct LiftRecord: Identifiable, Codable, Hashable, Sendable {
     public var performedAt: Date
     public var verification: VerificationStatus
     public var flagCount: Int
+    public var isPro: Bool
 
     public init(id: UUID = UUID(), lifterID: UUID, displayName: String, username: String, gymID: String, sex: Sex,
                 exerciseID: String, weightKg: Double, reps: Int, bodyweightKg: Double, performedAt: Date,
-                verification: VerificationStatus, flagCount: Int = 0) {
+                verification: VerificationStatus, flagCount: Int = 0, isPro: Bool = false) {
         self.id = id
         self.lifterID = lifterID
         self.displayName = displayName
@@ -33,15 +34,18 @@ public struct LiftRecord: Identifiable, Codable, Hashable, Sendable {
         self.performedAt = performedAt
         self.verification = verification
         self.flagCount = flagCount
+        self.isPro = isPro
     }
 }
 
 public enum LeaderboardScope: Hashable, Sendable {
+    /// One gym's members. Honour system: every logged lift counts.
     case gym(String)
+    /// Every LiftBros member in the UK. Top 100 shown; evidence required.
     case unitedKingdom
 }
 
-public enum LeaderboardMetric: String, CaseIterable, Hashable, Sendable {
+public enum LeaderboardMetric: String, CaseIterable, Codable, Hashable, Sendable {
     /// Estimated one-rep max in kg.
     case absolute
     /// Estimated one-rep max divided by bodyweight.

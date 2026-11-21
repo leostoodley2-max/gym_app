@@ -36,7 +36,8 @@ struct WorkoutDetailView: View {
                         }
                     }
                 }
-                .navigationTitle(session.title)
+                .darkList()
+                .navigationTitle(session.title.uppercased())
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {

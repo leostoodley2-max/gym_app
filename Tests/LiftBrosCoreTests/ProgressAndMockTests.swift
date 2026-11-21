@@ -61,7 +61,8 @@ final class MockCommunityTests: XCTestCase {
         let a = MockCommunity.generate(seed: 7, liftersPerGym: 10, now: now)
         let b = MockCommunity.generate(seed: 7, liftersPerGym: 10, now: now)
         XCTAssertEqual(a.records, b.records)
-        XCTAssertEqual(a.lifters.count, MockCommunity.gyms.count * 10)
+        let expected = MockCommunity.gyms.reduce(0) { $0 + MockCommunity.memberCount(for: $1, scale: 10) }
+        XCTAssertEqual(a.lifters.count, expected)
         XCTAssertEqual(Set(a.lifters.map(\.username)).count, a.lifters.count, "usernames must be unique")
 
         let benches = a.records.filter { $0.exerciseID == "bench-press" }
@@ -89,7 +90,8 @@ final class MockCommunityTests: XCTestCase {
     func testMockBackendVerificationFlow() async throws {
         let backend = MockBackendService(seed: 1, reviewDelay: 0)
         let setID = UUID()
-        let submitted = try await backend.submitProof(setID: setID, fileURL: URL(fileURLWithPath: "/tmp/x.mov"), kind: .video)
+        let submitted = try await backend.submitProof(setID: setID, fileURL: URL(fileURLWithPath: "/tmp/x.mov"),
+                                                      kind: .video, priority: false)
         XCTAssertEqual(submitted, .pending)
         let reviewed = try await backend.verificationStatus(setID: setID)
         XCTAssertEqual(reviewed, .verified)
@@ -126,5 +128,72 @@ final class MockCommunityTests: XCTestCase {
         XCTAssertEqual(loaded.sessions.first?.title, "Leg day")
         XCTAssertEqual(loaded.bodyMetrics.count, 1)
         try? FileManager.default.removeItem(at: dir)
+    }
+}
+
+final class PlansAndGymsTests: XCTestCase {
+    func testGymDirectoryIsWorcestershireWithUniqueIDs() {
+        let gyms = WorcestershireGyms.all
+        XCTAssertGreaterThan(gyms.count, 50)
+        XCTAssertEqual(Set(gyms.map(\.id)).count, gyms.count)
+        for district in District.allCases {
+            XCTAssertTrue(gyms.contains { $0.district == district }, "no gyms in \(district)")
+        }
+        XCTAssertTrue(gyms.contains { $0.id == "puregym-worcester" })
+    }
+
+    func testEvidenceQuota() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        func set(uploadedDaysAgo days: Double) -> LiftSet {
+            LiftSet(weightKg: 100, reps: 1, bodyweightKg: 80,
+                    proof: ProofMedia(kind: .video, filename: "x.mov", uploadedAt: now.addingTimeInterval(-days * 86_400)),
+                    verification: .pending)
+        }
+        let session = WorkoutSession(title: "S", gymID: "g", entries: [
+            ExerciseEntry(exerciseID: "bench-press", sets: [set(uploadedDaysAgo: 1), set(uploadedDaysAgo: 2),
+                                                           set(uploadedDaysAgo: 60), LiftSet(weightKg: 1, reps: 1, bodyweightKg: 80)]),
+        ])
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/London")!
+        let used = PlanLimits.evidenceUploadsThisMonth(in: [session], now: now, calendar: calendar)
+        XCTAssertEqual(used, 2)
+        XCTAssertTrue(PlanLimits.canUploadEvidence(isPro: false, usedThisMonth: 2))
+        XCTAssertFalse(PlanLimits.canUploadEvidence(isPro: false, usedThisMonth: PlanLimits.freeEvidenceUploadsPerMonth))
+        XCTAssertTrue(PlanLimits.canUploadEvidence(isPro: true, usedThisMonth: 99))
+    }
+
+    func testFreeHistoryWindow() {
+        let now = Date()
+        let points = [ProgressPoint(date: now.addingTimeInterval(-200 * 86_400), value: 1),
+                      ProgressPoint(date: now.addingTimeInterval(-7 * 86_400), value: 2)]
+        XCTAssertEqual(PlanLimits.visibleHistory(points, isPro: false, now: now).map(\.value), [2])
+        XCTAssertEqual(PlanLimits.visibleHistory(points, isPro: true, now: now).count, 2)
+    }
+
+    func testScreenPairingAndChallenges() async throws {
+        let backend = MockBackendService(seed: 1)
+        let paired = try await backend.pairScreen(code: "worc 2026")
+        XCTAssertEqual(paired?.gymID, "puregym-worcester")
+        XCTAssertNotNil(paired?.activeChallenge())
+        let none = try await backend.pairScreen(code: "NOPE-0000")
+        XCTAssertNil(none)
+        let basic = try await backend.fetchPartnership(gymID: "wyreside-barbell")
+        XCTAssertEqual(basic?.tier, .screen)
+        XCTAssertNil(basic?.activeChallenge(), "Screen tier doesn't include challenges")
+        for partnership in MockCommunity.samplePartnerships() {
+            XCTAssertNotNil(MockCommunity.gyms.first { $0.id == partnership.gymID }, partnership.gymID)
+        }
+    }
+
+    func testPriorityReviewIsFaster() async throws {
+        let backend = MockBackendService(seed: 1, reviewDelay: 1.2)
+        let normal = UUID(), priority = UUID()
+        _ = try await backend.submitProof(setID: normal, fileURL: URL(fileURLWithPath: "/tmp/a"), kind: .video, priority: false)
+        _ = try await backend.submitProof(setID: priority, fileURL: URL(fileURLWithPath: "/tmp/b"), kind: .video, priority: true)
+        try await Task.sleep(nanoseconds: 600_000_000)
+        let normalStatus = try await backend.verificationStatus(setID: normal)
+        let priorityStatus = try await backend.verificationStatus(setID: priority)
+        XCTAssertEqual(normalStatus, .pending)
+        XCTAssertEqual(priorityStatus, .verified)
     }
 }

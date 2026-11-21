@@ -21,8 +21,9 @@ struct ActiveWorkoutView: View {
                     ContentUnavailableView("No active workout", systemImage: "dumbbell")
                 }
             }
-            .navigationTitle(store.activeSession?.title ?? "Workout")
+            .navigationTitle((store.activeSession?.title ?? "Workout").uppercased())
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.background, for: .navigationBar)
             .navigationDestination(for: UUID.self) { setID in
                 SetDetailView(setID: setID)
             }
@@ -40,7 +41,12 @@ struct ActiveWorkoutView: View {
                         Button("Finish workout", systemImage: "checkmark") { confirmFinish = true }
                         Button("Discard workout", systemImage: "trash", role: .destructive) { confirmDiscard = true }
                     } label: {
-                        Text("Finish").fontWeight(.semibold)
+                        Text("Finish")
+                            .font(.subheadline.weight(.heavy))
+                            .foregroundStyle(Theme.onAccent)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Theme.accent, in: Capsule())
                     }
                 }
             }
@@ -65,7 +71,7 @@ struct ActiveWorkoutView: View {
             }
             .sheet(item: $logTarget) { entry in
                 LogSetView(entryID: entry.id, exerciseID: entry.exerciseID) { isWarmup in
-                    restTimer.start(seconds: isWarmup ? 60 : restTimer.defaultSeconds)
+                    restTimer.start(seconds: isWarmup ? 60 : store.restSeconds)
                 }
             }
             .onChange(of: demo.logSetOpen) { _, open in
@@ -92,7 +98,7 @@ struct ActiveWorkoutView: View {
                     dismiss()
                 }
             } message: {
-                Text("All sets and proof in this workout will be deleted.")
+                Text("All sets and evidence in this workout will be deleted.")
             }
         }
     }
@@ -100,21 +106,29 @@ struct ActiveWorkoutView: View {
     private func workoutList(_ session: WorkoutSession) -> some View {
         List {
             Section {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    HStack {
-                        Label(Format.duration(context.date.timeIntervalSince(session.startedAt)), systemImage: "clock")
-                        Spacer()
-                        Label(Format.volume(session.totalVolumeKg, store.unit), systemImage: "scalemass")
-                        Spacer()
-                        Label("\(session.workingSets.count) sets", systemImage: "list.number")
+                VStack(spacing: 14) {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        VStack(spacing: 2) {
+                            Text("ELAPSED")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Theme.secondaryText)
+                            Text(Format.clock(context.date.timeIntervalSince(session.startedAt)))
+                                .font(.system(size: 64, weight: .black).width(.condensed).monospacedDigit())
+                                .foregroundStyle(.white)
+                        }
                     }
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        workoutStat("VOLUME", Format.volume(session.totalVolumeKg, store.unit))
+                        workoutStat("SETS", "\(session.workingSets.count)")
+                        workoutStat("LIFTS", "\(session.entries.count)")
+                    }
+                    if let gym = store.gym(id: session.gymID) {
+                        GymCaption(name: gym.name)
+                    }
                 }
-                if let gym = store.gym(id: session.gymID) {
-                    Label(gym.name, systemImage: "mappin.and.ellipse")
-                        .font(.subheadline)
-                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .listRowBackground(Color.clear)
             }
 
             ForEach(session.entries) { entry in
@@ -134,13 +148,14 @@ struct ActiveWorkoutView: View {
                         logTarget = entry
                     } label: {
                         Label("Add set", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
                     }
                 } header: {
                     HStack {
-                        Text(entry.exercise?.name ?? entry.exerciseID)
-                            .font(.headline)
-                            .textCase(nil)
-                            .foregroundStyle(.primary)
+                        Text((entry.exercise?.name ?? entry.exerciseID).uppercased())
+                            .font(.display(19))
+                            .foregroundStyle(.white)
                         Spacer()
                         Menu {
                             Button("Remove exercise", systemImage: "trash", role: .destructive) {
@@ -158,14 +173,23 @@ struct ActiveWorkoutView: View {
                     showExercisePicker = true
                 } label: {
                     Label("Add exercise", systemImage: "plus")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PrimaryButtonStyle())
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
             }
         }
+        .darkList()
+    }
+
+    private func workoutStat(_ title: String, _ value: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value).font(.stat(17)).foregroundStyle(.white)
+            Text(title).font(.caption2.weight(.bold)).foregroundStyle(Theme.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -181,7 +205,7 @@ struct SetRow: View {
         HStack(spacing: 12) {
             Text(set.isWarmup ? "W" : "\(index + 1)")
                 .font(.subheadline.weight(.bold).monospacedDigit())
-                .foregroundStyle(set.isWarmup ? Color.orange : Color.secondary)
+                .foregroundStyle(set.isWarmup ? Theme.orange : Theme.secondaryText)
                 .frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -214,17 +238,22 @@ struct PRBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "trophy.fill").font(.title2).foregroundStyle(Theme.gold)
-            VStack(alignment: .leading) {
-                Text("New personal record!").font(.headline)
+            Image(systemName: "trophy.fill")
+                .font(.title2)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 44, height: 44)
+                .background(Theme.onAccent, in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text("NEW PERSONAL RECORD").font(.display(19))
                 Text("\(celebration.exerciseName) · e1RM \(Format.weight(celebration.oneRepMaxKg, unit))")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold))
             }
+            .foregroundStyle(Theme.onAccent)
+            Spacer(minLength: 0)
         }
-        .padding()
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(radius: 8)
+        .padding(12)
+        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: Theme.accent.opacity(0.35), radius: 18)
         .padding(.horizontal)
         .padding(.top, 4)
     }

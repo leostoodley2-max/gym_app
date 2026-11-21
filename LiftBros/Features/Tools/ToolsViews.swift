@@ -37,7 +37,8 @@ struct PlateCalculatorView: View {
                 }
             }
         }
-        .navigationTitle("Plate calculator")
+        .darkList()
+        .navigationTitle("PLATE CALCULATOR")
     }
 }
 
@@ -88,7 +89,8 @@ struct OneRepMaxCalculatorView: View {
             }
             Section("Estimated one-rep max") {
                 Text(Format.weight(oneRM, unit))
-                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .font(.display(48))
+                    .foregroundStyle(Theme.accent)
                 if let profile = store.profile, profile.bodyweightKg > 0 {
                     LabeledContent("Pound for pound",
                                    value: Format.ratio(StrengthCalculator.relativeStrength(oneRepMaxKg: oneRM,
@@ -106,7 +108,8 @@ struct OneRepMaxCalculatorView: View {
                 Text("Epley formula below 10 reps, Brzycki from 10. Use these as working-weight targets.")
             }
         }
-        .navigationTitle("1RM calculator")
+        .darkList()
+        .navigationTitle("1RM CALCULATOR")
     }
 }
 
@@ -119,7 +122,9 @@ struct HowRankingWorksView: View {
                 Text("Weighted pull-ups and dips count bodyweight plus added weight. Dumbbell lifts are ranked by the weight of one dumbbell.")
             }
             Section("Boards") {
-                Text("**My Gym** ranks members of your home gym. **United Kingdom** ranks every LiftBros member in the UK. Filter by division (Open, Men, Women) and by all time or this month's season.")
+                Text("**My Gym** ranks members of your home gym on the **honour system**: every lift you log counts straight away, no evidence needed. Partner gyms show this board live on their screens.")
+                Text("**National** shows the **top \(LeaderboardEngine.nationalListSize)** lifters in the UK. Only lifts with approved video evidence appear. If your best lift would make the top \(LeaderboardEngine.nationalListSize), LiftBros shows your provisional position and asks you to upload evidence.")
+                Text("Filter by division (Open, Men, Women) and by all time or this month's season.")
             }
             Section("Tiers") {
                 ForEach(StrengthTier.allCases, id: \.self) { tier in
@@ -133,17 +138,18 @@ struct HowRankingWorksView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            Section("Verification") {
-                Label("Unverified: no proof yet. Still ranks, without a tick.", systemImage: VerificationStatus.unverified.symbol)
-                Label("Pending: proof uploaded and in review.", systemImage: VerificationStatus.pending.symbol)
+            Section("Evidence") {
+                Label("Unverified: counts at your gym; not shown nationally.", systemImage: VerificationStatus.unverified.symbol)
+                Label("Pending: evidence uploaded and in review.", systemImage: VerificationStatus.pending.symbol)
                     .foregroundStyle(VerificationStatus.pending.color)
-                Label("Verified: proof accepted. Green tick, and counts on verified-only boards.", systemImage: VerificationStatus.verified.symbol)
+                Label("Verified: approved, and eligible for the national top \(LeaderboardEngine.nationalListSize).", systemImage: VerificationStatus.verified.symbol)
                     .foregroundStyle(VerificationStatus.verified.color)
-                Text("Good proof is one continuous video showing the plates or weight stack, your full body and every rep. Anyone can flag a suspicious lift. Unverified lifts with repeated flags are hidden until proof is provided.")
+                Text("Good evidence is one continuous video showing the plates or weight stack, your full body and every rep. Free accounts get \(PlanLimits.freeEvidenceUploadsPerMonth) evidence uploads a month; Pro is unlimited with priority review. Anyone can report a suspicious lift, and lifts reported several times are hidden until evidence is provided.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
+        .darkList()
         .navigationTitle("How it works")
     }
 

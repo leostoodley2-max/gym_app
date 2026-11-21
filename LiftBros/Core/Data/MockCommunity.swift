@@ -52,23 +52,10 @@ public struct MockLifter: Hashable, Sendable {
     public let bodyStatsVisibility: Audience
 }
 
-/// Generates a believable UK lifting community for demos, previews and tests.
+/// Generates a sample lifting community at real Worcestershire gyms for demos, previews and tests.
+/// The people are fictional: the app labels them as sample data until a live backend is connected.
 public enum MockCommunity {
-    public static let gyms: [Gym] = [
-        Gym(id: "ironworks-manchester", name: "Ironworks Gym", city: "Manchester", nation: .england, postcodeArea: "M"),
-        Gym(id: "forge-shoreditch", name: "The Forge", city: "London (Shoreditch)", nation: .england, postcodeArea: "E"),
-        Gym(id: "southside-brixton", name: "Southside Strength", city: "London (Brixton)", nation: .england, postcodeArea: "SW"),
-        Gym(id: "steel-city-sheffield", name: "Steel City Barbell", city: "Sheffield", nation: .england, postcodeArea: "S"),
-        Gym(id: "northern-leeds", name: "Northern Barbell Club", city: "Leeds", nation: .england, postcodeArea: "LS"),
-        Gym(id: "digbeth-birmingham", name: "Digbeth Lifting Co.", city: "Birmingham", nation: .england, postcodeArea: "B"),
-        Gym(id: "harbourside-bristol", name: "Harbourside Fitness", city: "Bristol", nation: .england, postcodeArea: "BS"),
-        Gym(id: "quayside-newcastle", name: "Quayside Strength", city: "Newcastle", nation: .england, postcodeArea: "NE"),
-        Gym(id: "dockyard-liverpool", name: "Dockyard Gym", city: "Liverpool", nation: .england, postcodeArea: "L"),
-        Gym(id: "clyde-glasgow", name: "Clyde Iron", city: "Glasgow", nation: .scotland, postcodeArea: "G"),
-        Gym(id: "castle-edinburgh", name: "Castle Rock Fitness", city: "Edinburgh", nation: .scotland, postcodeArea: "EH"),
-        Gym(id: "bay-cardiff", name: "Bay Barbell", city: "Cardiff", nation: .wales, postcodeArea: "CF"),
-        Gym(id: "lagan-belfast", name: "Lagan Lifting", city: "Belfast", nation: .northernIreland, postcodeArea: "BT"),
-    ]
+    public static let gyms: [Gym] = WorcestershireGyms.all
 
     private static let maleNames = ["Jack", "Harry", "Oliver", "George", "Charlie", "Alfie", "Callum", "Ryan", "Kieran",
                                     "Liam", "Mo", "Arjun", "Tom", "Josh", "Dan", "Ben", "Sam", "Jamie", "Rhys", "Euan",
@@ -86,6 +73,19 @@ public enum MockCommunity {
         public let records: [LiftRecord]
     }
 
+    /// Sample members per gym, roughly by gym size.
+    static func memberCount(for gym: Gym, scale: Int) -> Int {
+        let base: Int
+        switch gym.kind {
+        case .chain, .leisure: base = 28
+        case .strength: base = 20
+        case .independent, .crossfit: base = 14
+        case .college, .healthClub: base = 8
+        }
+        return max(1, base * scale / 24)
+    }
+
+    /// - Parameter liftersPerGym: scale factor; 24 gives the default gym sizes.
     public static func generate(seed: UInt64 = 2026, liftersPerGym: Int = 24, now: Date = Date()) -> Community {
         var rng = SeededGenerator(seed: seed)
         var lifters: [MockLifter] = []
@@ -93,7 +93,7 @@ public enum MockCommunity {
         var usedUsernames = Set<String>()
 
         for gym in gyms {
-            for _ in 0..<liftersPerGym {
+            for _ in 0..<memberCount(for: gym, scale: liftersPerGym) {
                 let isFemale = rng.chance(0.3)
                 let sex: Sex = isFemale ? .female : .male
                 let first = isFemale ? rng.pick(femaleNames) : rng.pick(maleNames)
@@ -122,6 +122,7 @@ public enum MockCommunity {
                 lifters.append(lifter)
 
                 let verifiedRate = rng.unit() * 0.8
+                let isPro = rng.chance(0.15)
                 for exercise in ExerciseLibrary.all {
                     let isFeatured = ExerciseLibrary.featuredIDs.contains(exercise.id)
                     guard rng.chance(isFeatured ? 0.85 : 0.45) else { continue }
@@ -141,7 +142,7 @@ public enum MockCommunity {
                         id: rng.uuid(), lifterID: lifter.id, displayName: lifter.displayName, username: lifter.username,
                         gymID: gym.id, sex: sex, exerciseID: exercise.id, weightKg: weight, reps: reps,
                         bodyweightKg: lifter.bodyweightKg, performedAt: now.addingTimeInterval(-daysAgo * 86_400),
-                        verification: verification))
+                        verification: verification, isPro: isPro))
                 }
             }
         }
@@ -179,5 +180,26 @@ public enum MockCommunity {
             let date = now.addingTimeInterval(-Double(weeks - 1 - week) * 7 * 86_400)
             return ProgressPoint(date: date, value: week == weeks - 1 ? oneRepMax : value)
         }
+    }
+
+    /// Sample gym partnerships so the in-gym screen can be demoed.
+    public static func samplePartnerships(now: Date = Date(), calendar: Calendar = .current) -> [GymPartnership] {
+        let month = calendar.dateInterval(of: .month, for: now) ?? DateInterval(start: now, duration: 30 * 86_400)
+        return [
+            GymPartnership(
+                gymID: "puregym-worcester", tier: .screenPlus, status: .active, pairingCode: "WORC-2026",
+                screen: ScreenConfig(accentHex: "D4FF3F"),
+                challenge: GymChallenge(title: "December Bench Battle", exerciseID: "bench-press", metric: .relative,
+                                        startsAt: month.start, endsAt: month.end, prize: "3 months free membership"),
+                renewsAt: month.end),
+            GymPartnership(gymID: "wyreside-barbell", tier: .screen, status: .trial, pairingCode: "WYRE-0001",
+                           renewsAt: month.end),
+            GymPartnership(
+                gymID: "abbey-stadium-sports-fitness-centre", tier: .screenPlus, status: .active,
+                pairingCode: "ABBY-7788",
+                challenge: GymChallenge(title: "Squat Season", exerciseID: "back-squat", metric: .absolute,
+                                        startsAt: month.start, endsAt: month.end, prize: "LiftBros hoodie"),
+                renewsAt: month.end),
+        ]
     }
 }

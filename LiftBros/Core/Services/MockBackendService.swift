@@ -1,20 +1,22 @@
 import Foundation
 
-/// In-memory backend with a generated UK community. Proof is "reviewed" automatically after
-/// `reviewDelay` seconds so the verification flow can be demoed end to end.
+/// In-memory backend with a generated sample community at real Worcestershire gyms. Evidence is "reviewed"
+/// automatically after `reviewDelay` seconds (a third of that for priority/Pro) so the flow can be demoed.
 public actor MockBackendService: BackendService {
     private let community: MockCommunity.Community
     private var recordsByExercise: [String: [LiftRecord]]
     private var publishedByUser: [UUID: [LiftRecord]] = [:]
-    private var proofSubmissions: [UUID: Date] = [:]
+    private var proofSubmissions: [UUID: (date: Date, priority: Bool)] = [:]
     private var flags: [UUID: Int] = [:]
     private let reviewDelay: TimeInterval
+    private let partnerships: [String: GymPartnership]
 
     public init(seed: UInt64 = 2026, reviewDelay: TimeInterval = 6) {
         let community = MockCommunity.generate(seed: seed)
         self.community = community
         self.recordsByExercise = Dictionary(grouping: community.records, by: \.exerciseID)
         self.reviewDelay = reviewDelay
+        self.partnerships = Dictionary(uniqueKeysWithValues: MockCommunity.samplePartnerships().map { ($0.gymID, $0) })
     }
 
     public func fetchGyms() async throws -> [Gym] { MockCommunity.gyms }
@@ -36,18 +38,19 @@ public actor MockBackendService: BackendService {
         publishedByUser[lifterID] = nil
     }
 
-    public func submitProof(setID: UUID, fileURL: URL, kind: ProofKind) async throws -> VerificationStatus {
-        proofSubmissions[setID] = Date()
+    public func submitProof(setID: UUID, fileURL: URL, kind: ProofKind, priority: Bool) async throws -> VerificationStatus {
+        proofSubmissions[setID] = (Date(), priority)
         return .pending
     }
 
     public func verificationStatus(setID: UUID) async throws -> VerificationStatus {
         guard let submitted = proofSubmissions[setID] else {
             // Unknown to this in-memory backend (e.g. after an app relaunch): treat as just submitted.
-            proofSubmissions[setID] = Date()
+            proofSubmissions[setID] = (Date(), false)
             return reviewDelay <= 0 ? .verified : .pending
         }
-        return Date().timeIntervalSince(submitted) >= reviewDelay ? .verified : .pending
+        let delay = submitted.priority ? reviewDelay / 3 : reviewDelay
+        return Date().timeIntervalSince(submitted.date) >= delay ? .verified : .pending
     }
 
     public func flag(recordID: UUID, reason: FlagReason) async throws {
@@ -76,5 +79,14 @@ public actor MockBackendService: BackendService {
         }
         return MockCommunity.progressHistory(endingAt: StrengthCalculator.estimatedOneRepMax(for: record),
                                              lifterID: id, exerciseID: exerciseID)
+    }
+
+    public func fetchPartnership(gymID: String) async throws -> GymPartnership? {
+        partnerships[gymID]
+    }
+
+    public func pairScreen(code: String) async throws -> GymPartnership? {
+        let wanted = GymPartnership.normalise(code: code)
+        return partnerships.values.first { GymPartnership.normalise(code: $0.pairingCode) == wanted && $0.status.isLive }
     }
 }

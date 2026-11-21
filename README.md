@@ -1,6 +1,6 @@
 # LiftBros 🏋️
 
-An iOS app for UK gym-goers to log lifts, climb their gym's leaderboard and see how they rank across the United Kingdom.
+An iOS app for gym-goers to log lifts, climb their gym's leaderboard and break into the UK's national top 100. It launches across **every gym in Worcestershire** (70 gyms; see [docs/GYMS.md](docs/GYMS.md)).
 
 ## Screenshots
 
@@ -12,9 +12,13 @@ An iOS app for UK gym-goers to log lifts, climb their gym's leaderboard and see 
 |---|---|---|---|
 | ![Gym](docs/screenshots/06-rankingsGym.png) | ![UK](docs/screenshots/07-rankingsUK.png) | ![P4P](docs/screenshots/08-rankingsP4P.png) | ![Lifter](docs/screenshots/09-lifter.png) |
 
-| Welcome | Progress | Profile |
-|---|---|---|
-| ![Welcome](docs/screenshots/01-onboarding.png) | ![Progress](docs/screenshots/10-progress.png) | ![Profile](docs/screenshots/11-profile.png) |
+| Welcome | Progress | Profile | Pro |
+|---|---|---|---|
+| ![Welcome](docs/screenshots/01-onboarding.png) | ![Progress](docs/screenshots/10-progress.png) | ![Profile](docs/screenshots/11-profile.png) | ![Pro](docs/screenshots/12-paywall.png) |
+
+| Gym screen (B2B) |
+|---|
+| ![Gym screen](docs/screenshots/13-gymScreen.png) |
 
 🎬 [Screen recording (30 s tour)](docs/screenshots/liftbros-tour.mp4)
 
@@ -23,9 +27,12 @@ Screenshots are generated automatically by the **Screenshots** workflow (`script
 ## Features
 
 - **Workout logging**: 26 commercial-gym exercises, including bench press, squat, deadlift, lat pulldown, leg press, cable rows, machines, dumbbells and weighted pull-ups/dips. Log weight × reps, warm-ups and RPE. It includes a rest timer and PR celebrations, and pre-fills from your last set.
-- **Leaderboards**: **My Gym** and **United Kingdom** boards for every exercise. Filter by division (Open, Men, Women), all time or this month's season, and verified-only.
+- **Gym leaderboards (honour system)**: every lift logged at your gym counts straight away, with a podium, your rank and the gap to the next lifter. Filter by division (Open, Men, Women) and all time or this month's season.
+- **National leaderboard (evidence required)**: shows the UK top 100 verified lifts. If your best lift would make the top 100, the app shows your provisional position and asks you to upload video evidence to be listed.
 - **Pound-for-pound board**: a separate ranking by estimated 1RM ÷ bodyweight at the time of the lift.
-- **Proof and verification**: attach a video or photo of a set from your library. Sets with proof go *Pending → Verified*; sets without proof still rank, marked *Unverified*. Anyone can flag a suspicious lift.
+- **Evidence**: attach a video of a set. It goes *Pending → Verified*. Anyone can report a suspicious lift.
+- **LiftBros Pro** (£3.99/mo or £29.99/yr, StoreKit 2): unlimited evidence uploads (free accounts get 3 a month), priority review, all-time charts, head-to-head compare, CSV export, a custom rest timer and a Pro badge. See [docs/MONETISATION.md](docs/MONETISATION.md).
+- **LiftBros for Gyms**: a subscription base for gyms (Screen £99, Screen+ £199, Network) to show their leaderboard live on gym TVs. Gym screen mode pairs a device with a code and rotates boards, the monthly challenge and a join QR code.
 - **Strength tiers**: Bronze → Silver → Gold → Platinum → Diamond → Elite per lift, from bodyweight-ratio standards adjusted by sex.
 - **Progress tracking**: e1RM charts with next-tier target lines, personal bests, weekly volume, streaks and a bodyweight trend.
 - **Privacy controls**: choose who sees your progress and your body stats (Everyone / My gym / Only me), and whether you appear on leaderboards.

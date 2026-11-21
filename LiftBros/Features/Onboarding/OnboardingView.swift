@@ -27,13 +27,15 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 if step != .welcome {
                     ProgressView(value: Double(step.rawValue), total: Double(Step.allCases.count - 1))
+                        .tint(Theme.accent)
                         .padding(.horizontal)
                         .padding(.top, 8)
                 }
                 content
                 footer
             }
-            .navigationTitle(title)
+            .screenBackground()
+            .navigationTitle(title.uppercased())
             .navigationBarTitleDisplayMode(.inline)
             .animation(.default, value: step)
         }
@@ -62,27 +64,50 @@ struct OnboardingView: View {
     // MARK: Steps
 
     private var welcome: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "trophy.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(Theme.accent.gradient)
-            Text("LiftBros")
-                .font(.system(size: 44, weight: .black, design: .rounded))
-            Text("Log your lifts. Climb your gym's leaderboard. See how you stack up across the UK.")
-                .font(.title3)
+        VStack(spacing: 22) {
+            Text("LIFTBROS · WORCESTERSHIRE")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.secondaryText)
+                .padding(.top, 12)
+            Text("LOG IT.\nRANK IT.\nPROVE IT.")
+                .font(.display(56))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 32)
-            VStack(alignment: .leading, spacing: 14) {
-                feature("dumbbell.fill", "Track every set on bench, squat, lat pulldown and 20+ gym staples")
-                feature("checkmark.seal.fill", "Upload video proof to get your lifts verified")
+                .foregroundStyle(.white)
+                .lineSpacing(-8)
+            HStack(spacing: -18) {
+                welcomeCard(symbol: "dumbbell.fill", title: "Log", value: "120 × 5", color: Theme.lavender)
+                    .rotationEffect(.degrees(-8))
+                welcomeCard(symbol: "trophy.fill", title: "Your gym", value: "#1", color: Theme.accent)
+                    .zIndex(1)
+                    .scaleEffect(1.08)
+                welcomeCard(symbol: "checkmark.seal.fill", title: "National", value: "Top 100", color: Theme.teal)
+                    .rotationEffect(.degrees(8))
+            }
+            .padding(.vertical, 10)
+            VStack(alignment: .leading, spacing: 12) {
+                feature("hand.raised.fill", "Gym leaderboards on the honour system: every set counts")
+                feature("checkmark.seal.fill", "Make the national top 100 with video evidence")
                 feature("scalemass.fill", "Pound-for-pound rankings that factor in bodyweight")
                 feature("lock.fill", "You choose who sees your progress")
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 28)
             Spacer()
         }
+    }
+
+    private func welcomeCard(symbol: String, title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Theme.onAccent)
+            Spacer()
+            Text(title.uppercased()).font(.caption2.weight(.black)).foregroundStyle(Theme.onAccent.opacity(0.7))
+            Text(value).font(.display(24)).foregroundStyle(Theme.onAccent).lineLimit(1).minimumScaleFactor(0.6)
+        }
+        .padding(14)
+        .frame(width: 118, height: 150, alignment: .leading)
+        .background(color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
     }
 
     private func feature(_ symbol: String, _ text: String) -> some View {
@@ -90,7 +115,7 @@ struct OnboardingView: View {
             Image(systemName: symbol)
                 .foregroundStyle(Theme.accent)
                 .frame(width: 24)
-            Text(text).font(.subheadline)
+            Text(text).font(.subheadline).foregroundStyle(.white)
         }
     }
 
@@ -117,6 +142,7 @@ struct OnboardingView: View {
                 .pickerStyle(.segmented)
             }
         }
+        .darkList()
     }
 
     private var gymStep: some View {
@@ -153,6 +179,7 @@ struct OnboardingView: View {
                 }
             }
         }
+        .darkList()
     }
 
     private var privacyStep: some View {
@@ -162,24 +189,25 @@ struct OnboardingView: View {
     // MARK: Footer & navigation
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 10) {
             if step != .welcome {
-                Button("Back") { step = Step(rawValue: step.rawValue - 1) ?? .welcome }
-                    .buttonStyle(.bordered)
+                Button {
+                    step = Step(rawValue: step.rawValue - 1) ?? .welcome
+                } label: {
+                    Image(systemName: "chevron.left").font(.headline)
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .frame(width: 64)
             }
-            Button {
+            Button(step == .privacy ? "Start lifting" : (step == .welcome ? "Start building your strength" : "Next")) {
                 advance()
-            } label: {
-                Text(step == .privacy ? "Start lifting" : (step == .welcome ? "Get started" : "Next"))
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(PrimaryButtonStyle())
             .disabled(!canAdvance)
+            .opacity(canAdvance ? 1 : 0.45)
         }
-        .controlSize(.large)
         .padding()
-        .background(.bar)
+        .background(Theme.background)
     }
 
     private var canAdvance: Bool {
@@ -226,7 +254,7 @@ func yearsLabel(_ years: Double) -> String {
     return years == 1 ? "1 year" : "\(formatted) years"
 }
 
-/// Searchable list of gyms, grouped by nation.
+/// Searchable list of Worcestershire gyms, grouped by district.
 struct GymPickerList: View {
     @Environment(AppStore.self) private var store
     @Binding var selection: String?
@@ -235,26 +263,31 @@ struct GymPickerList: View {
     private var filtered: [Gym] {
         let query = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !query.isEmpty else { return store.gyms }
+        let compactQuery = query.replacingOccurrences(of: " ", with: "")
         return store.gyms.filter {
             $0.name.lowercased().contains(query) || $0.city.lowercased().contains(query)
+                || $0.brand.lowercased().contains(query)
+                || (!$0.postcode.isEmpty && $0.postcode.lowercased().replacingOccurrences(of: " ", with: "").hasPrefix(compactQuery))
                 || $0.postcodeArea.lowercased() == query
         }
     }
 
     var body: some View {
         List {
-            ForEach(UKNation.allCases, id: \.self) { nation in
-                let gyms = filtered.filter { $0.nation == nation }
+            ForEach(District.allCases, id: \.self) { district in
+                let gyms = filtered.filter { $0.district == district }.sorted { $0.name < $1.name }
                 if !gyms.isEmpty {
-                    Section(nation.displayName) {
+                    Section(district.displayName) {
                         ForEach(gyms) { gym in
                             Button {
                                 selection = gym.id
                             } label: {
                                 HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(gym.name).foregroundStyle(.primary)
-                                        Text(gym.city).font(.caption).foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(gym.name).foregroundStyle(.white)
+                                        Text("\(gym.subtitle) · \(gym.kind.displayName)")
+                                            .font(.caption)
+                                            .foregroundStyle(Theme.secondaryText)
                                     }
                                     Spacer()
                                     if selection == gym.id {
@@ -267,12 +300,13 @@ struct GymPickerList: View {
                 }
             }
             Section {
-                Text("Can't find your gym? In the full release you'll be able to add it, or join by scanning the QR code at reception.")
+                Text("LiftBros is launching across Worcestershire first. Gym missing or closed? Let us know and we'll update the list.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
             }
         }
-        .searchable(text: $search, prompt: "Search by gym, city or postcode area")
+        .darkList()
+        .searchable(text: $search, prompt: "Search gym, town or postcode")
     }
 }
 
@@ -284,6 +318,7 @@ struct PrivacySettingsForm: View {
         Form {
             PrivacySettingsSection(privacy: $privacy)
         }
+        .darkList()
     }
 }
 

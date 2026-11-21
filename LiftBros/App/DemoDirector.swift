@@ -8,6 +8,7 @@ enum AppTab: Hashable {
 
 enum DemoScreen: String {
     case onboarding, train, workout, logSet, setDetail, rankingsGym, rankingsUK, rankingsP4P, lifter, progress, profile
+    case paywall, gymScreen
 }
 
 /// Debug-only demo mode for screenshots and screen recordings.
@@ -36,6 +37,8 @@ final class DemoDirector {
     var leaderboardUK = false
     var leaderboardRelative = false
     var openTopLifterTick = 0
+    var showPaywall = false
+    var showGymScreen = false
 
     @ObservationIgnored private weak var store: AppStore?
     @ObservationIgnored private var benchEntryID: UUID?
@@ -64,6 +67,7 @@ final class DemoDirector {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LiftBrosDemo", isDirectory: true)
         try? FileManager.default.removeItem(at: directory)
         let store = AppStore(backend: MockBackendService(reviewDelay: 3600), local: LocalStore(directory: directory))
+        store.subscriptions.setPreviewPro(false)
         self.store = store
         if screen != .onboarding { seed(store) }
         return store
@@ -103,6 +107,7 @@ final class DemoDirector {
         case .rankingsGym:
             tab = .rankings
         case .rankingsUK:
+            logDemoSet(startTimer: false)   // an unverified PR, so the national card asks for evidence
             leaderboardUK = true
             tab = .rankings
         case .rankingsP4P:
@@ -118,11 +123,17 @@ final class DemoDirector {
             tab = .progress
         case .profile:
             tab = .profile
+        case .paywall:
+            await pause(0.6)
+            showPaywall = true
+        case .gymScreen:
+            await pause(0.6)
+            showGymScreen = true
         }
     }
 
     private func runTour() async {
-        await pause(3.0)                        // Home
+        await pause(4.0)                        // Home
         showActiveWorkout = true                // Workout in progress
         await pause(2.5)
         logSetOpen = true                       // Log a set
@@ -131,24 +142,30 @@ final class DemoDirector {
         await pause(3.5)
         showActiveWorkout = false
         await pause(1.0)
-        withAnimation { tab = .rankings }       // Gym leaderboard
-        await pause(3.0)
-        withAnimation { leaderboardUK = true }  // UK leaderboard
-        await pause(2.5)
+        withAnimation { tab = .rankings }       // Gym leaderboard (honour system)
+        await pause(3.5)
+        withAnimation { leaderboardUK = true }  // National: top 100, evidence needed
+        await pause(3.5)
         withAnimation { leaderboardRelative = true } // Pound for pound
         await pause(2.5)
         openTopLifterTick += 1                  // Another lifter's profile
         await pause(3.0)
         withAnimation { tab = .progress }
-        await pause(3.5)
+        await pause(3.0)
         withAnimation { tab = .profile }
+        await pause(2.5)
+        showPaywall = true                      // LiftBros Pro
+        await pause(3.0)
+        showPaywall = false
+        await pause(1.0)
+        showGymScreen = true                    // In-gym leaderboard screen
     }
 
-    private func logDemoSet() {
+    private func logDemoSet(startTimer: Bool = true) {
         guard let store, let benchEntryID else { return }
-        store.addSet(entryID: benchEntryID, weightKg: 102.5, reps: 5, rpe: 9, isWarmup: false)
+        store.addSet(entryID: benchEntryID, weightKg: 122.5, reps: 5, rpe: 9, isWarmup: false)
         logSetOpen = false
-        restTimerTick += 1
+        if startTimer { restTimerTick += 1 }
     }
 
     private func pause(_ seconds: Double) async {
@@ -171,7 +188,7 @@ final class DemoDirector {
         let now = Date()
         let day: TimeInterval = 86_400
         let weeks = 16
-        let gymID = "ironworks-manchester"
+        let gymID = "puregym-worcester"
         let proofData = Self.proofImageData()
 
         func proof() -> ProofMedia? {
@@ -183,22 +200,22 @@ final class DemoDirector {
             displayName: "Alex Carter", username: "alexlifts", gymID: gymID, sex: .male,
             birthYear: calendar.component(.year, from: now) - 27, heightCm: 180, bodyweightKg: 82.5,
             bodyFatPercent: 14.5, yearsLifting: 4, trainingDaysPerWeek: 4, goal: .strength,
-            bio: "Chasing a 200 kg deadlift.", createdAt: now.addingTimeInterval(-Double(weeks) * 7 * day))
+            bio: "Chasing a 220 kg deadlift.", createdAt: now.addingTimeInterval(-Double(weeks) * 7 * day))
 
         let push = [
-            PlannedLift(id: "bench-press", start: 85, end: 100, reps: 5, sets: 3, step: 2.5),
-            PlannedLift(id: "overhead-press", start: 50, end: 60, reps: 5, sets: 3, step: 2.5),
+            PlannedLift(id: "bench-press", start: 100, end: 120, reps: 5, sets: 3, step: 2.5),
+            PlannedLift(id: "overhead-press", start: 55, end: 70, reps: 5, sets: 3, step: 2.5),
             PlannedLift(id: "dumbbell-bench-press", start: 30, end: 36, reps: 8, sets: 3, step: 2),
             PlannedLift(id: "tricep-pushdown", start: 30, end: 40, reps: 10, sets: 3, step: 2.5),
         ]
         let pull = [
-            PlannedLift(id: "deadlift", start: 150, end: 180, reps: 3, sets: 2, step: 2.5),
+            PlannedLift(id: "deadlift", start: 175, end: 210, reps: 3, sets: 2, step: 2.5),
             PlannedLift(id: "lat-pulldown", start: 65, end: 80, reps: 8, sets: 3, step: 2.5),
             PlannedLift(id: "seated-cable-row", start: 60, end: 75, reps: 10, sets: 3, step: 2.5),
             PlannedLift(id: "dumbbell-curl", start: 14, end: 18, reps: 10, sets: 3, step: 2),
         ]
         let legs = [
-            PlannedLift(id: "back-squat", start: 110, end: 135, reps: 5, sets: 3, step: 2.5),
+            PlannedLift(id: "back-squat", start: 135, end: 165, reps: 5, sets: 3, step: 2.5),
             PlannedLift(id: "leg-press", start: 180, end: 240, reps: 10, sets: 3, step: 5),
             PlannedLift(id: "leg-extension", start: 50, end: 65, reps: 12, sets: 3, step: 2.5),
             PlannedLift(id: "seated-leg-curl", start: 45, end: 55, reps: 12, sets: 3, step: 2.5),
@@ -257,16 +274,16 @@ final class DemoDirector {
 
         // Today's workout, in progress.
         let activeStart = now.addingTimeInterval(-38 * 60)
-        let verifiedSet = LiftSet(weightKg: 100, reps: 5, rpe: 8.5, performedAt: activeStart.addingTimeInterval(600),
+        let verifiedSet = LiftSet(weightKg: 120, reps: 5, rpe: 8.5, performedAt: activeStart.addingTimeInterval(600),
                                   bodyweightKg: 82.5, proof: proof(), verification: .verified)
         let bench = ExerciseEntry(exerciseID: "bench-press", sets: [
             LiftSet(weightKg: 60, reps: 8, performedAt: activeStart.addingTimeInterval(300), bodyweightKg: 82.5, isWarmup: true),
             verifiedSet,
-            LiftSet(weightKg: 100, reps: 5, rpe: 9, performedAt: activeStart.addingTimeInterval(800), bodyweightKg: 82.5),
+            LiftSet(weightKg: 120, reps: 5, rpe: 9, performedAt: activeStart.addingTimeInterval(800), bodyweightKg: 82.5),
         ])
         let press = ExerciseEntry(exerciseID: "overhead-press", sets: [
-            LiftSet(weightKg: 57.5, reps: 5, performedAt: activeStart.addingTimeInterval(1500), bodyweightKg: 82.5),
-            LiftSet(weightKg: 57.5, reps: 5, performedAt: activeStart.addingTimeInterval(1700), bodyweightKg: 82.5),
+            LiftSet(weightKg: 70, reps: 5, performedAt: activeStart.addingTimeInterval(1500), bodyweightKg: 82.5),
+            LiftSet(weightKg: 70, reps: 5, performedAt: activeStart.addingTimeInterval(1700), bodyweightKg: 82.5),
         ])
         benchEntryID = bench.id
         verifiedSetID = verifiedSet.id
@@ -283,7 +300,7 @@ final class DemoDirector {
                 Image(systemName: "figure.strengthtraining.traditional")
                     .font(.system(size: 260))
                     .foregroundStyle(.white)
-                Text("Proof: 100 kg × 5")
+                Text("Evidence: 120 kg × 5")
                     .font(.system(size: 52, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
             }

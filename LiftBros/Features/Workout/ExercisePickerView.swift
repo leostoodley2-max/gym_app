@@ -31,6 +31,7 @@ struct ExercisePickerView: View {
                     }
                 }
             }
+            .darkList()
             .searchable(text: $search, prompt: "Search exercises")
             .navigationTitle("Add exercise")
             .navigationBarTitleDisplayMode(.inline)
@@ -75,6 +76,7 @@ struct ExerciseMenu: View {
             HStack(spacing: 4) {
                 Text(ExerciseLibrary.exercise(id: selection)?.name ?? "Exercise")
                     .font(.headline)
+                    .foregroundStyle(Theme.accent)
                 Image(systemName: "chevron.up.chevron.down").font(.caption)
             }
         }

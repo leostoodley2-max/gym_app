@@ -2,6 +2,8 @@ import Charts
 import SwiftUI
 
 struct ProgressDashboardView: View {
+    @Binding var showPaywall: Bool
+
     @Environment(AppStore.self) private var store
     @State private var exerciseID: String?
     @State private var showLogBodyweight = false
@@ -10,10 +12,24 @@ struct ProgressDashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    visibilityBanner
+                    HStack(alignment: .top) {
+                        ScreenTitle(title: "Progress", subtitle: "Your strength")
+                        CircleIconButton(systemImage: "scalemass.fill") { showLogBodyweight = true }
+                            .accessibilityLabel("Log bodyweight")
+                            .padding(.top, 14)
+                    }
+                    visibilityPicker
                     if store.allSessions.isEmpty {
-                        ContentUnavailableView("Nothing to chart yet", systemImage: "chart.xyaxis.line",
-                                               description: Text("Log your first workout and your strength progress will appear here."))
+                        VStack(spacing: 10) {
+                            Image(systemName: "chart.xyaxis.line").font(.system(size: 40)).foregroundStyle(Theme.accent)
+                            Text("Nothing to chart yet").font(.headline)
+                            Text("Log your first workout and your strength progress appears here.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.secondaryText)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .card()
                     } else {
                         stats
                         strengthChart
@@ -22,19 +38,12 @@ struct ProgressDashboardView: View {
                     }
                     bodyweightChart
                 }
-                .padding()
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Progress")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showLogBodyweight = true
-                    } label: {
-                        Label("Log bodyweight", systemImage: "scalemass")
-                    }
-                }
-            }
+            .screenBackground()
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showLogBodyweight) {
                 LogBodyMetricView()
             }
@@ -47,41 +56,44 @@ struct ProgressDashboardView: View {
         }
     }
 
-    private var visibilityBanner: some View {
+    private var visibilityPicker: some View {
         HStack {
             Image(systemName: store.profile?.privacy.progressVisibility == .onlyMe ? "lock.fill" : "eye.fill")
-                .foregroundStyle(Theme.accent)
-            Text("Visible to")
-                .font(.subheadline)
+                .foregroundStyle(Theme.onAccent)
+                .frame(width: 32, height: 32)
+                .background(Theme.lavender, in: Circle())
+            Text("Who can see your progress")
+                .font(.subheadline.weight(.semibold))
             Spacer()
             Picker("Visible to", selection: Binding(
                 get: { store.profile?.privacy.progressVisibility ?? .everyone },
                 set: { newValue in store.updateProfile { $0.privacy.progressVisibility = newValue } })) {
                 ForEach(Audience.allCases, id: \.self) { Text($0.displayName).tag($0) }
             }
+            .tint(Theme.accent)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: 12))
+        .card(padding: 10, radius: 20)
     }
 
     private var stats: some View {
         let sessions = store.finishedSessions
         let totalVolume = sessions.reduce(0) { $0 + $1.totalVolumeKg }
         let verified = store.allSessions.flatMap(\.workingSets).filter { $0.verification == .verified }.count
-        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             StatTile(title: "Workouts", value: "\(sessions.count)", systemImage: "figure.strengthtraining.traditional")
             StatTile(title: "Week streak", value: "\(ProgressAnalyzer.weeklyStreak(sessions: sessions))",
-                     systemImage: "flame.fill", tint: .orange)
+                     systemImage: "flame.fill", tint: Theme.orange)
             StatTile(title: "Total volume", value: Format.volume(totalVolume, store.unit), systemImage: "scalemass.fill",
-                     tint: .blue)
-            StatTile(title: "Verified lifts", value: "\(verified)", systemImage: "checkmark.seal.fill", tint: .green)
+                     tint: Theme.lavender)
+            StatTile(title: "Verified sets", value: "\(verified)", systemImage: "checkmark.seal.fill", tint: Theme.teal)
         }
     }
 
     @ViewBuilder private var strengthChart: some View {
         if let exerciseID, let exercise = ExerciseLibrary.exercise(id: exerciseID), let profile = store.profile {
-            let history = ProgressAnalyzer.oneRepMaxHistory(exerciseID: exerciseID, in: store.allSessions)
+            let fullHistory = ProgressAnalyzer.oneRepMaxHistory(exerciseID: exerciseID, in: store.allSessions)
+            let history = PlanLimits.visibleHistory(fullHistory, isPro: store.isPro)
+            let hiddenCount = fullHistory.count - history.count
             let best = store.personalBests[exerciseID]
             let tier = best.map {
                 StrengthCalculator.tier(oneRepMaxKg: $0.estimatedOneRepMaxKg, bodyweightKg: profile.bodyweightKg,
@@ -99,33 +111,50 @@ struct ProgressDashboardView: View {
                     if let tier { TierBadge(tier: tier) }
                 }
                 if let best {
-                    Text("Best e1RM \(Format.weight(best.estimatedOneRepMaxKg, store.unit))")
-                        .font(.title2.weight(.bold))
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("BEST e1RM").font(.caption2.weight(.bold)).foregroundStyle(Theme.secondaryText)
+                        Text(Format.weight(best.estimatedOneRepMaxKg, store.unit)).font(.display(40))
+                    }
                 }
                 Chart {
                     ForEach(history) { point in
+                        AreaMark(x: .value("Date", point.date), y: .value("e1RM", store.unit.fromKg(point.value)))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(LinearGradient(colors: [Theme.accent.opacity(0.35), .clear],
+                                                            startPoint: .top, endPoint: .bottom))
                         LineMark(x: .value("Date", point.date), y: .value("e1RM", store.unit.fromKg(point.value)))
                             .interpolationMethod(.monotone)
                             .foregroundStyle(Theme.accent)
+                            .lineStyle(StrokeStyle(lineWidth: 3))
                         PointMark(x: .value("Date", point.date), y: .value("e1RM", store.unit.fromKg(point.value)))
                             .foregroundStyle(Theme.accent)
+                            .symbolSize(30)
                     }
                     if let nextTarget, let next = tier?.next {
                         RuleMark(y: .value("Next tier", store.unit.fromKg(nextTarget)))
                             .foregroundStyle(next.color)
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             .annotation(position: .top, alignment: .leading) {
-                                Text("\(next.displayName) \(Format.weight(nextTarget, store.unit))")
-                                    .font(.caption2.weight(.semibold))
+                                Text("\(next.displayName.uppercased()) \(Format.weight(nextTarget, store.unit))")
+                                    .font(.caption2.weight(.heavy))
                                     .foregroundStyle(next.color)
                             }
                     }
                 }
                 .chartYScale(domain: .automatic(includesZero: false))
                 .frame(height: 220)
+                if hiddenCount > 0 {
+                    Button {
+                        showPaywall = true
+                    } label: {
+                        Label("\(hiddenCount) older sessions hidden. See all-time progress with Pro.", systemImage: "crown.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .padding()
-            .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: 16))
+            .card()
         }
     }
 
@@ -137,8 +166,8 @@ struct ProgressDashboardView: View {
             return l != r ? l < r : lhs.exerciseID < rhs.exerciseID
         }
         if !bests.isEmpty, let profile = store.profile {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Personal bests").font(.title3.weight(.bold))
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader(title: "Personal bests")
                 ForEach(bests) { best in
                     let exercise = ExerciseLibrary.exercise(id: best.exerciseID)
                     HStack {
@@ -149,16 +178,16 @@ struct ProgressDashboardView: View {
                             }
                             Text("\(Format.liftSet(best.set, exercise: exercise, unit: store.unit)) · \(Format.shortDate(best.set.performedAt))")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.secondaryText)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(Format.weight(best.estimatedOneRepMaxKg, store.unit))
-                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .font(.stat(16).monospacedDigit())
                             Text(Format.ratio(StrengthCalculator.relativeStrength(oneRepMaxKg: best.estimatedOneRepMaxKg,
                                                                                   bodyweightKg: best.set.bodyweightKg)))
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.secondaryText)
                         }
                         if let exercise {
                             TierBadge(tier: StrengthCalculator.tier(oneRepMaxKg: best.estimatedOneRepMaxKg,
@@ -167,28 +196,30 @@ struct ProgressDashboardView: View {
                                       compact: true)
                         }
                     }
-                    Divider()
+                    .card(padding: 12, radius: 18)
                 }
             }
-            .padding()
-            .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: 16))
         }
     }
 
     @ViewBuilder private var volumeChart: some View {
-        let weekly = ProgressAnalyzer.weeklyVolume(in: store.finishedSessions).suffix(12)
+        let weekly = Array(ProgressAnalyzer.weeklyVolume(in: store.finishedSessions).suffix(8))
         if !weekly.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Weekly volume").font(.title3.weight(.bold))
-                Chart(Array(weekly)) { point in
-                    BarMark(x: .value("Week", point.date, unit: .weekOfYear),
-                            y: .value("Volume", store.unit.fromKg(point.value)))
-                        .foregroundStyle(Color.blue.gradient)
-                }
-                .frame(height: 160)
+            let bars: [HighlightBarChart.Bar] = weekly.indices.map { index in
+                HighlightBarChart.Bar(id: index, label: weekly[index].date.formatted(.dateTime.day()),
+                                      value: weekly[index].value, isHighlighted: index == weekly.count - 1)
             }
-            .padding()
-            .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: 16))
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("WEEKLY VOLUME").font(.display(20))
+                    Spacer()
+                    if let last = weekly.last {
+                        Text(Format.volume(last.value, store.unit)).font(.stat(17))
+                    }
+                }
+                HighlightBarChart(bars: bars, height: 120, highlight: Theme.lavender)
+            }
+            .card()
         }
     }
 
@@ -196,29 +227,28 @@ struct ProgressDashboardView: View {
         if !store.bodyMetrics.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Bodyweight").font(.title3.weight(.bold))
+                    Text("BODYWEIGHT").font(.display(20))
                     Spacer()
                     if let latest = store.bodyMetrics.last {
-                        Text(Format.weight(latest.bodyweightKg, store.unit)).font(.headline)
+                        Text(Format.weight(latest.bodyweightKg, store.unit)).font(.stat(17))
                     }
                 }
                 if store.bodyMetrics.count > 1 {
                     Chart(store.bodyMetrics) { entry in
                         LineMark(x: .value("Date", entry.date), y: .value("Bodyweight", store.unit.fromKg(entry.bodyweightKg)))
-                            .foregroundStyle(.purple)
-                        PointMark(x: .value("Date", entry.date), y: .value("Bodyweight", store.unit.fromKg(entry.bodyweightKg)))
-                            .foregroundStyle(.purple)
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(Theme.pink)
+                            .lineStyle(StrokeStyle(lineWidth: 3))
                     }
                     .chartYScale(domain: .automatic(includesZero: false))
-                    .frame(height: 160)
+                    .frame(height: 140)
                 } else {
-                    Text("Log your bodyweight regularly to see the trend. Your pound-for-pound score uses your bodyweight on the day of each lift.")
+                    Text("Log your bodyweight regularly to see the trend. Pound-for-pound scores use your bodyweight on the day of each lift.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                 }
             }
-            .padding()
-            .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: 16))
+            .card()
         }
     }
 }
@@ -237,7 +267,8 @@ struct LogBodyMetricView: View {
                 DecimalField(title: "Body fat", value: $bodyFat, suffix: "%", prompt: "Optional")
                 DatePicker("Date", selection: $date, in: ...Date(), displayedComponents: .date)
             }
-            .navigationTitle("Log bodyweight")
+            .darkList()
+            .navigationTitle("LOG BODYWEIGHT")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }

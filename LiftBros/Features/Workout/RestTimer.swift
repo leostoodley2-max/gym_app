@@ -27,7 +27,7 @@ struct RestTimerBar: View {
                 let remaining = max(0, Int(end.timeIntervalSince(context.date).rounded(.up)))
                 HStack(spacing: 16) {
                     Image(systemName: remaining == 0 ? "bell.fill" : "timer")
-                        .foregroundStyle(remaining == 0 ? Color.green : Theme.accent)
+                        .foregroundStyle(remaining == 0 ? Theme.teal : Theme.accent)
                     Text(remaining == 0 ? "Rest over — next set!" : String(format: "Rest %ld:%02ld", remaining / 60, remaining % 60))
                         .font(.headline.monospacedDigit())
                     Spacer()
@@ -43,7 +43,7 @@ struct RestTimerBar: View {
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 10)
-                .background(.regularMaterial)
+                .background(Theme.surfaceRaised)
                 .sensoryFeedback(.success, trigger: remaining == 0)
             }
         }

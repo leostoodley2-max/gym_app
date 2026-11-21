@@ -24,7 +24,7 @@ enum ProofImporter {
     enum ImportError: LocalizedError {
         case unsupported
 
-        var errorDescription: String? { "That file couldn't be used as proof. Pick a video or photo of your set." }
+        var errorDescription: String? { "That file couldn't be used as evidence. Pick a video or photo of your set." }
     }
 
     static func load(_ item: PhotosPickerItem) async throws -> PickedProof {
@@ -79,13 +79,13 @@ struct VerificationExplainer: View {
     private var message: String {
         switch status {
         case .unverified:
-            return "This lift still counts on leaderboards, marked as unverified. Upload a video showing the weight, full range of motion and every rep to get it verified."
+            return "Counts on your gym leaderboard (honour system). To appear in the national top 100, upload a video showing the weight, full range of motion and every rep."
         case .pending:
-            return "Your proof is being reviewed. It stays on the leaderboard as unverified until then."
+            return "Evidence is in review. Once approved, this lift can appear on the national leaderboard."
         case .verified:
-            return "Verified. This lift shows a green tick and counts on verified-only leaderboards."
+            return "Verified. This lift is eligible for the national leaderboard."
         case .rejected:
-            return "This proof wasn't accepted, so the lift is shown as unverified. Try a clearer video showing the plates and full reps."
+            return "This evidence wasn't accepted, so the lift won't show nationally. It still counts at your gym. Try a clearer video showing the plates and full reps."
         }
     }
 }

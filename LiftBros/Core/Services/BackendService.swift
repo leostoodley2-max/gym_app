@@ -28,8 +28,9 @@ public protocol BackendService: AnyObject, Sendable {
     /// Removes the user's records from public leaderboards (e.g. after opting out).
     func unpublishRecords(lifterID: UUID) async throws
 
-    /// Uploads proof for a set. Returns the status after upload, normally `.pending`.
-    func submitProof(setID: UUID, fileURL: URL, kind: ProofKind) async throws -> VerificationStatus
+    /// Uploads evidence for a set. Returns the status after upload, normally `.pending`.
+    /// `priority` puts Pro members at the front of the review queue.
+    func submitProof(setID: UUID, fileURL: URL, kind: ProofKind, priority: Bool) async throws -> VerificationStatus
 
     /// Polls the review outcome for a set with proof.
     func verificationStatus(setID: UUID) async throws -> VerificationStatus
@@ -41,4 +42,12 @@ public protocol BackendService: AnyObject, Sendable {
 
     /// Progress history for another lifter. Returns nil when their progress is private to you.
     func fetchLifterProgress(id: UUID, exerciseID: String, viewerGymID: String) async throws -> [ProgressPoint]?
+
+    // MARK: Gym partnerships (B2B screens)
+
+    /// The gym's LiftBros screen subscription, if it has one.
+    func fetchPartnership(gymID: String) async throws -> GymPartnership?
+
+    /// Pairs a screen device using the code from the gym's partner dashboard.
+    func pairScreen(code: String) async throws -> GymPartnership?
 }

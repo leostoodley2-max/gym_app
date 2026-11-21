@@ -15,6 +15,14 @@ struct SetContext {
     let isInActiveSession: Bool
 }
 
+enum EvidenceError: LocalizedError {
+    case monthlyLimitReached
+
+    var errorDescription: String? {
+        "You've used your \(PlanLimits.freeEvidenceUploadsPerMonth) free evidence uploads this month. Upgrade to Pro for unlimited uploads."
+    }
+}
+
 /// Proof media picked from the photo library, ready to be stored.
 enum PickedProof {
     case video(URL)
@@ -41,10 +49,15 @@ final class AppStore {
     /// Bumped on any change that could affect leaderboards, so views know to re-rank.
     private(set) var dataVersion = 0
     var prCelebration: PRCelebration?
+    /// The signed-in user's gym's screen subscription, if any.
+    private(set) var currentPartnership: GymPartnership?
+    /// Default rest between sets (customisable with Pro).
+    private(set) var restSeconds: Int = UserDefaults.standard.object(forKey: "LiftBros.restSeconds") as? Int ?? 120
 
     @ObservationIgnored private var communityCache: [String: [LiftRecord]] = [:]
     @ObservationIgnored let backend: BackendService
     @ObservationIgnored let local: LocalStore
+    @ObservationIgnored let subscriptions = SubscriptionManager()
 
     init(backend: BackendService = MockBackendService(), local: LocalStore = LocalStore()) {
         self.backend = backend
@@ -54,7 +67,10 @@ final class AppStore {
         sessions = data.sessions
         activeSession = data.activeSession
         bodyMetrics = data.bodyMetrics
-        Task { await loadGyms() }
+        Task {
+            await loadGyms()
+            await loadPartnership()
+        }
     }
 
     // MARK: - Derived data
@@ -62,6 +78,24 @@ final class AppStore {
     var unit: WeightUnit { profile?.unit ?? .kg }
 
     var currentGym: Gym? { profile.flatMap { gym(id: $0.gymID) } }
+
+    /// Existing users whose saved gym is no longer in the directory must pick again.
+    var needsGymSelection: Bool { profile != nil && currentGym == nil }
+
+    var isPro: Bool { subscriptions.isPro }
+
+    /// True while running on the built-in sample community rather than a live server.
+    var isUsingSampleData: Bool { backend is MockBackendService }
+
+    var evidenceUploadsThisMonth: Int { PlanLimits.evidenceUploadsThisMonth(in: allSessions) }
+
+    var canUploadEvidence: Bool {
+        PlanLimits.canUploadEvidence(isPro: isPro, usedThisMonth: evidenceUploadsThisMonth)
+    }
+
+    var evidenceUploadsLeft: Int? {
+        isPro ? nil : max(0, PlanLimits.freeEvidenceUploadsPerMonth - evidenceUploadsThisMonth)
+    }
 
     func gym(id: String) -> Gym? { gyms.first { $0.id == id } }
 
@@ -76,7 +110,17 @@ final class AppStore {
 
     var myRecords: [LiftRecord] {
         guard let profile, profile.privacy.showOnLeaderboards else { return [] }
-        return LeaderboardEngine.records(from: allSessions, profile: profile)
+        let pro = isPro
+        return LeaderboardEngine.records(from: allSessions, profile: profile).map { record in
+            var record = record
+            record.isPro = pro
+            return record
+        }
+    }
+
+    func setRestSeconds(_ seconds: Int) {
+        restSeconds = seconds
+        UserDefaults.standard.set(seconds, forKey: "LiftBros.restSeconds")
     }
 
     var loggedExerciseIDs: [String] {
@@ -113,6 +157,12 @@ final class AppStore {
         }
         persist()
         sync()
+    }
+
+    func chooseGym(_ gymID: String) {
+        updateProfile { $0.gymID = gymID }
+        if activeSession != nil { activeSession?.gymID = gymID }
+        Task { await loadPartnership() }
     }
 
     func updateProfile(_ transform: (inout UserProfile) -> Void) {
@@ -277,6 +327,8 @@ final class AppStore {
     }
 
     func attachProof(_ picked: PickedProof, toSet setID: UUID) throws {
+        let isReplacement = findSet(id: setID)?.set.proof != nil
+        if !isReplacement && !canUploadEvidence { throw EvidenceError.monthlyLimitReached }
         let filename: String
         switch picked {
         case .video(let url):
@@ -296,7 +348,8 @@ final class AppStore {
         let fileURL = local.proofURL(for: media)
         Task {
             do {
-                let status = try await backend.submitProof(setID: setID, fileURL: fileURL, kind: media.kind)
+                let status = try await backend.submitProof(setID: setID, fileURL: fileURL, kind: media.kind,
+                                                            priority: self.isPro)
                 self.applyVerification(status, to: setID)
                 // Check back once the review is likely to have happened.
                 try await Task.sleep(nanoseconds: 7_000_000_000)
@@ -336,18 +389,80 @@ final class AppStore {
     // MARK: - Leaderboards & community
 
     func leaderboard(for query: LeaderboardQuery) async -> [LeaderboardRow] {
-        let community: [LiftRecord]
-        if let cached = communityCache[query.exerciseID] {
-            community = cached
-        } else {
-            community = (try? await backend.fetchCommunityRecords(exerciseID: query.exerciseID)) ?? []
-            communityCache[query.exerciseID] = community
-        }
+        let community = await communityRecords(for: query.exerciseID)
         let mine = myRecords.filter { $0.exerciseID == query.exerciseID }
         return LeaderboardEngine.rank(records: community + mine, query: query, currentUserID: profile?.id)
     }
 
     func clearCommunityCache() { communityCache.removeAll() }
+
+    private func communityRecords(for exerciseID: String) async -> [LiftRecord] {
+        if let cached = communityCache[exerciseID] { return cached }
+        let fetched = (try? await backend.fetchCommunityRecords(exerciseID: exerciseID)) ?? []
+        communityCache[exerciseID] = fetched
+        return fetched
+    }
+
+    func nationalStanding(for query: LeaderboardQuery) async -> NationalStanding {
+        let community = await communityRecords(for: query.exerciseID)
+        let mine = myRecords.filter { $0.exerciseID == query.exerciseID }
+        return LeaderboardEngine.nationalStanding(records: community + mine, query: query, currentUserID: profile?.id)
+    }
+
+    /// Ranks for a gym's screen (honour system, everyone at that gym).
+    func screenLeaderboard(gymID: String, exerciseID: String, metric: LeaderboardMetric,
+                           since: Date? = nil) async -> [LeaderboardRow] {
+        let community = await communityRecords(for: exerciseID)
+        let mine = myRecords.filter { $0.exerciseID == exerciseID }
+        var records = community + mine
+        if let since { records = records.filter { $0.performedAt >= since } }
+        return LeaderboardEngine.rank(records: records,
+                                      query: LeaderboardQuery(exerciseID: exerciseID, scope: .gym(gymID), metric: metric),
+                                      currentUserID: profile?.id)
+    }
+
+    // MARK: - Gym partnerships
+
+    func loadPartnership() async {
+        guard let gymID = profile?.gymID else {
+            currentPartnership = nil
+            return
+        }
+        currentPartnership = try? await backend.fetchPartnership(gymID: gymID)
+    }
+
+    func pairScreen(code: String) async -> GymPartnership? {
+        try? await backend.pairScreen(code: code)
+    }
+
+    // MARK: - Export (Pro)
+
+    /// Writes every logged set to a CSV file and returns its URL.
+    func exportCSV() throws -> URL {
+        var lines = ["date,workout,gym,exercise,weight_kg,reps,rpe,warmup,bodyweight_kg,e1rm_kg,verification"]
+        let formatter = ISO8601DateFormatter()
+        for session in allSessions.reversed() {
+            let gymName = gym(id: session.gymID)?.name ?? session.gymID
+            for entry in session.entries {
+                let exercise = entry.exercise
+                for set in entry.sets {
+                    let e1rm = StrengthCalculator.estimatedOneRepMax(for: set, exercise: exercise)
+                    let fields: [String] = [
+                        formatter.string(from: set.performedAt), session.title, gymName, exercise?.name ?? entry.exerciseID,
+                        String(set.weightKg), String(set.reps), set.rpe.map { String($0) } ?? "",
+                        set.isWarmup ? "yes" : "no", String(set.bodyweightKg),
+                        String((e1rm * 10).rounded() / 10), set.verification.rawValue,
+                    ]
+                    lines.append(fields.map { field in
+                        field.contains(",") || field.contains("\"") ? "\"\(field.replacingOccurrences(of: "\"", with: "\"\""))\"" : field
+                    }.joined(separator: ","))
+                }
+            }
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("LiftBros-export.csv")
+        try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
 
     func flag(_ record: LiftRecord, reason: FlagReason) async {
         try? await backend.flag(recordID: record.id, reason: reason)

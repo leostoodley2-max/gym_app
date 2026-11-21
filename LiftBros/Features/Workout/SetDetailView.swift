@@ -10,6 +10,7 @@ struct SetDetailView: View {
     @State private var isUploading = false
     @State private var errorMessage: String?
     @State private var confirmDelete = false
+    @State private var showPaywall = false
 
     var body: some View {
         Group {
@@ -19,8 +20,9 @@ struct SetDetailView: View {
                 ContentUnavailableView("Set not found", systemImage: "questionmark.circle")
             }
         }
-        .navigationTitle("Set details")
+        .navigationTitle("SET DETAILS")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPaywall) { PaywallView() }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             Task { await upload(item) }
@@ -39,9 +41,11 @@ struct SetDetailView: View {
         return List {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(exercise?.name ?? context.exerciseID).font(.title2.weight(.bold))
+                    Text((exercise?.name ?? context.exerciseID).uppercased())
+                        .font(.display(22))
+                        .foregroundStyle(Theme.secondaryText)
                     Text(Format.liftSet(set, exercise: exercise, unit: store.unit))
-                        .font(.title.weight(.heavy).monospacedDigit())
+                        .font(.display(44).monospacedDigit())
                     Text(set.performedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -76,22 +80,37 @@ struct SetDetailView: View {
                         ProofPreview(media: proof, url: store.proofURL(for: proof))
                             .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     }
-                    PhotosPicker(selection: $pickerItem, matching: .any(of: [.videos, .images])) {
-                        HStack {
-                            Label(set.proof == nil ? "Upload video proof" : "Replace proof",
-                                  systemImage: set.proof == nil ? "video.badge.plus" : "arrow.triangle.2.circlepath")
-                            Spacer()
-                            if isUploading { ProgressView() }
+                    if set.proof != nil || store.canUploadEvidence {
+                        PhotosPicker(selection: $pickerItem, matching: .any(of: [.videos, .images])) {
+                            HStack {
+                                Label(set.proof == nil ? "Upload video evidence" : "Replace evidence",
+                                      systemImage: set.proof == nil ? "video.badge.plus" : "arrow.triangle.2.circlepath")
+                                    .foregroundStyle(Theme.accent)
+                                Spacer()
+                                if isUploading { ProgressView() }
+                            }
+                        }
+                        .disabled(isUploading)
+                    } else {
+                        Button {
+                            showPaywall = true
+                        } label: {
+                            Label("Monthly evidence limit reached. Go Pro for unlimited.", systemImage: "crown.fill")
+                                .foregroundStyle(Theme.accent)
                         }
                     }
-                    .disabled(isUploading)
+                    if let left = store.evidenceUploadsLeft, set.proof == nil {
+                        Text("\(left) of \(PlanLimits.freeEvidenceUploadsPerMonth) free uploads left this month")
+                            .font(.caption)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
                     if set.proof != nil {
-                        Button("Remove proof", role: .destructive) { store.removeProof(fromSet: setID) }
+                        Button("Remove evidence", role: .destructive) { store.removeProof(fromSet: setID) }
                     }
                 } header: {
-                    Text("Verification")
+                    Text("National leaderboard evidence")
                 } footer: {
-                    Text("Good proof shows the plates or pin, your whole body and every rep. Videos stay private to reviewers unless you make your progress public.")
+                    Text("Good evidence is one continuous video showing the plates or pin, your whole body and every rep. Videos are only seen by reviewers.")
                 }
             }
 
@@ -99,6 +118,7 @@ struct SetDetailView: View {
                 Button("Delete set", role: .destructive) { confirmDelete = true }
             }
         }
+        .darkList()
         .confirmationDialog("Delete this set?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete set", role: .destructive) {
                 store.deleteSet(id: setID)

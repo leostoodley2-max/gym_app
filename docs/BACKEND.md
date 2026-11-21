@@ -71,7 +71,43 @@ create table verification_reviews (
   notes text,
   reviewed_at timestamptz default now()
 );
+
+create table gym_partnerships (
+  gym_id text primary key references gyms,
+  tier text not null check (tier in ('screen','screenPlus','network')),
+  status text not null check (status in ('trial','active','pastDue','cancelled')),
+  pairing_code text unique not null,
+  screen_config jsonb not null,           -- ScreenConfig: exercises, metrics, rotation, rows, accent colour
+  stripe_subscription_id text,
+  renews_at timestamptz
+);
+
+create table gym_challenges (
+  id uuid primary key,
+  gym_id text references gyms,
+  title text not null,
+  exercise_id text not null,
+  metric text not null,                   -- absolute | relative
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  prize text
+);
+
+create table subscriptions (               -- LiftBros Pro, mirrored from App Store Server Notifications v2
+  user_id uuid references profiles,
+  product_id text not null,
+  original_transaction_id text primary key,
+  expires_at timestamptz,
+  status text not null
+);
 ```
+
+### Leaderboard rules
+
+- **Gym boards use an honour system.** Every set logged at the gym counts, verified or not.
+- **The national board** shows only **verified** sets, and only the **top 100**.
+- **Provisional rank.** For the signed-in user, the server also returns where their best lift *would* rank if it were verified (`NationalStanding`). The app uses it to ask for evidence once someone breaks into the top 100.
+- **Free accounts** get 3 evidence uploads a month. Pro uploads go to the front of the review queue.
 
 Leaderboards should be served from a materialized view (best set per lifter per exercise), refreshed on insert,
 using the same rules as `LeaderboardEngine`:

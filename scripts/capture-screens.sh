@@ -33,7 +33,7 @@ sleep 10
 
 echo "▶ Screenshots"
 i=1
-for screen in onboarding train workout logSet setDetail rankingsGym rankingsUK rankingsP4P lifter progress profile; do
+for screen in onboarding train workout logSet setDetail rankingsGym rankingsUK rankingsP4P lifter progress profile paywall gymScreen; do
   launch -LBScreen "$screen"
   sleep 6
   file=$(printf "%s/%02d-%s.png" "$OUT" "$i" "$screen")
@@ -50,7 +50,14 @@ xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$OUT/liftbros-tour.mp4
 REC_PID=$!
 sleep 2
 launch -LBTour
-sleep 36
+sleep 46
 kill -INT "$REC_PID"
 wait "$REC_PID" || true
+
+# Trim the launch and compress, when ffmpeg is available (keeps the repo small).
+if command -v ffmpeg >/dev/null 2>&1; then
+  ffmpeg -y -loglevel error -ss 3 -i "$OUT/liftbros-tour.mp4" -vf "scale=720:-2,fps=30" \
+    -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p -movflags +faststart -an "$OUT/tour-small.mp4" \
+    && mv "$OUT/tour-small.mp4" "$OUT/liftbros-tour.mp4"
+fi
 ls -lh "$OUT"
