@@ -191,9 +191,9 @@ final class DemoDirector {
         let gymID = "puregym-worcester"
         let proofData = Self.proofImageData()
 
-        func proof() -> ProofMedia? {
+        func proof(uploadedAt date: Date = Date()) -> ProofMedia? {
             guard let filename = try? store.local.saveProof(data: proofData, fileExtension: "jpg") else { return nil }
-            return ProofMedia(kind: .photo, filename: filename)
+            return ProofMedia(kind: .photo, filename: filename, uploadedAt: date)
         }
 
         let profile = UserProfile(
@@ -255,10 +255,10 @@ final class DemoDirector {
                                           bodyweightKg: bodyweight)
                         if setIndex == 0 && showcaseLifts.contains(lift.id) {
                             if week == weeks - 1 && lift.id == "back-squat" {
-                                set.proof = proof()
+                                set.proof = proof(uploadedAt: time)
                                 set.verification = .pending
-                            } else if week >= weeks - 7 && week % 2 == 1 {
-                                set.proof = proof()
+                            } else if week >= weeks - 7 && week <= weeks - 4 && week % 2 == 1 {
+                                set.proof = proof(uploadedAt: time)
                                 set.verification = .verified
                             }
                         }

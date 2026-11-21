@@ -128,11 +128,11 @@ struct GymDisplayView: View {
                 topBar
                 if wide {
                     HStack(alignment: .top, spacing: 18) {
-                        boardPanel.frame(maxWidth: .infinity)
+                        boardPanel(wide: true).frame(maxWidth: .infinity)
                         sidePanel.frame(width: geo.size.width * 0.32)
                     }
                 } else {
-                    boardPanel
+                    boardPanel(wide: false)
                     sidePanel
                 }
             }
@@ -170,8 +170,8 @@ struct GymDisplayView: View {
                 Text(gym.name.uppercased())
                     .font(.display(40))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.5)
             }
             Spacer()
             TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -186,7 +186,7 @@ struct GymDisplayView: View {
         }
     }
 
-    private var boardPanel: some View {
+    private func boardPanel(wide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text((ExerciseLibrary.exercise(id: current.exerciseID)?.name ?? "").uppercased())
@@ -213,14 +213,17 @@ struct GymDisplayView: View {
                             .font(.title3.weight(.bold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Spacer()
-                        Text(Format.record(row.record, unit: .kg))
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.secondaryText)
+                            .minimumScaleFactor(0.75)
+                        Spacer(minLength: 4)
+                        if wide {
+                            Text(Format.record(row.record, unit: .kg))
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.secondaryText)
+                        }
                         Text(Format.score(row.score, metric: current.metric, unit: .kg))
                             .font(.stat(22).monospacedDigit())
                             .foregroundStyle(row.rank == 1 ? accent : .white)
-                            .frame(minWidth: 100, alignment: .trailing)
+                            .frame(minWidth: wide ? 100 : 70, alignment: .trailing)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)

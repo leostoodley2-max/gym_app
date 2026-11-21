@@ -20,7 +20,7 @@ struct WorkoutHomeView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
-                .padding(.bottom, 24)
+                .padding(.bottom, 100)   // clear the floating tab bar
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)

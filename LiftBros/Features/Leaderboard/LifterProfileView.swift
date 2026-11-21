@@ -65,7 +65,7 @@ struct LifterProfileView: View {
                 bestLifts
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 24)
+            .padding(.bottom, 100)
         }
     }
 
